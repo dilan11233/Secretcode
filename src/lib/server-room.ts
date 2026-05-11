@@ -108,10 +108,16 @@ export async function enforceRateLimit(input: RateLimitInput) {
     .eq("id", existing.id);
 }
 
-export async function fetchRoomRaw(roomCode: string): Promise<GameState | null> {
+// ✅ FIX: room_token artık hem fetch hem persist'te kullanılıyor
+export async function fetchRoomRaw(roomCode: string): Promise<{ state: GameState; roomToken: string } | null> {
   const supabase = serverClient();
-  const { data } = await supabase.from("rooms").select("state").eq("room_code", roomCode).maybeSingle();
-  return (data?.state as GameState | undefined) ?? null;
+  const { data } = await supabase
+    .from("rooms")
+    .select("state, room_token")
+    .eq("room_code", roomCode)
+    .maybeSingle();
+  if (!data) return null;
+  return { state: data.state as GameState, roomToken: data.room_token as string };
 }
 
 export function sanitizeStateForPlayer(state: GameState, playerId: string | null): GameState {
@@ -135,11 +141,13 @@ async function bumpRoomEvent(roomCode: string) {
   await supabase.from("room_events").upsert({ room_code: roomCode, version }, { onConflict: "room_code" });
 }
 
-export async function persistRoom(roomCode: string, state: GameState) {
+// ✅ FIX: persistRoom artık room_token alıyor ve kaydediyor
+export async function persistRoom(roomCode: string, state: GameState, roomToken: string) {
   const supabase = serverClient();
   await supabase.from("rooms").upsert(
     {
       room_code: roomCode,
+      room_token: roomToken,
       host_player_id: state.hostPlayerId,
       state,
       updated_at: new Date().toISOString()
@@ -169,58 +177,63 @@ export function ensureHostState(state: GameState): GameState {
   return { ...state, hostPlayerId, players };
 }
 
-function canStartWithPlayers(players: Player[]) {
-  const teamBlue = players.filter((p) => p.team === "blue");
-  const teamGreen = players.filter((p) => p.team === "green");
-  const clueBlue = teamBlue.filter((p) => p.isClueGiver).length;
-  const clueGreen = teamGreen.filter((p) => p.isClueGiver).length;
-  return teamBlue.length > 0 && teamGreen.length > 0 && clueBlue === 1 && clueGreen === 1;
-}
-
 export async function joinRoom(input: {
   roomCode: string;
   nickname: string;
   playerId?: string;
   hostHint?: boolean;
   hostRole?: HostRole;
+  roomToken: string; // ✅ FIX: token artık buraya geliyor
 }): Promise<{ state: GameState; playerId: string }> {
   const roomCode = normalizeRoomCode(input.roomCode);
-  let state = await fetchRoomRaw(roomCode);
+  const raw = await fetchRoomRaw(roomCode);
 
-  if (!state) {
+  // ✅ FIX: Oda yoksa yeni oluştur, varsa token kontrolü yap
+  let state: GameState;
+  let roomToken: string;
+
+  if (!raw) {
+    // Yeni oda — token olarak gelen token'ı kullan
     state = createInitialGameState(roomCode);
+    roomToken = input.roomToken || nanoid(16);
+  } else {
+    // Mevcut oda — token eşleşmeli
+    if (raw.roomToken !== input.roomToken) {
+      throw new Error("Invalid room token.");
+    }
+    state = raw.state;
+    roomToken = raw.roomToken;
   }
 
   const id = input.playerId?.trim() || nanoid(8);
   const existing = state.players.find((p) => p.id === id) ?? null;
+
   const player: Player = existing ?? {
     id,
     nickname: input.nickname.trim().slice(0, 24) || "Guest",
-    team: null,
+    team: null, // ✅ FIX: null bırak, kullanıcı lobby'de seçsin
     isClueGiver: false,
     isHost: state.players.length === 0 && !!input.hostHint
   };
 
-  const assignedTeam = player.team ?? chooseBalancedTeam(state.players);
-  // Roles are now explicitly chosen via UI, not auto-assigned
-  const isClueGiver = existing?.isClueGiver ?? false;
-
-  const updatedPlayer = {
+  const updatedPlayer: Player = {
     ...player,
     nickname: input.nickname.trim().slice(0, 24) || player.nickname,
-    team: assignedTeam,
-    isClueGiver
+    // ✅ FIX: Mevcut oyuncunun team/role'unu koru, yeni oyuncunun null kalmasına izin ver
+    team: existing?.team ?? null,
+    isClueGiver: existing?.isClueGiver ?? false
   };
 
   const players = [...state.players.filter((p) => p.id !== id), updatedPlayer];
   const next = ensureHostState({ ...state, players });
-  await persistRoom(roomCode, next);
+  await persistRoom(roomCode, next, roomToken);
   return { state: next, playerId: id };
 }
 
-export async function applyTeamSelection(roomCode: string, playerId: string, team: Team) {
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) throw new Error("Room not found.");
+export async function applyTeamSelection(roomCode: string, playerId: string, team: Team, roomToken: string) {
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) throw new Error("Room not found.");
+  const { state } = raw;
   if (state.phase !== "lobby") throw new Error("Team selection is only allowed in lobby.");
   const player = state.players.find((p) => p.id === playerId);
   if (!player) throw new Error("Player not found.");
@@ -228,13 +241,38 @@ export async function applyTeamSelection(roomCode: string, playerId: string, tea
     ...state,
     players: state.players.map((p) => (p.id === playerId ? { ...p, team } : p))
   });
-  await persistRoom(roomCode, next);
+  await persistRoom(roomCode, next, roomToken);
   return next;
 }
 
-export async function applyClueGiverToggle(roomCode: string, playerId: string) {
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) throw new Error("Room not found.");
+export async function applyRoleSelection(roomCode: string, playerId: string, isManager: boolean, roomToken: string) {
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) throw new Error("Room not found.");
+  const { state } = raw;
+  if (state.phase !== "lobby") throw new Error("Role selection is only allowed in lobby.");
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) throw new Error("Player not found.");
+
+  // ✅ FIX: Manager seçilmek isteniyorsa takımda zaten başka manager var mı kontrol et
+  if (isManager && player.team) {
+    const alreadyHasManager = state.players.some(
+      (p) => p.id !== playerId && p.team === player.team && p.isClueGiver
+    );
+    if (alreadyHasManager) throw new Error("This team already has a Manager.");
+  }
+
+  const next = ensureHostState({
+    ...state,
+    players: state.players.map((p) => (p.id === playerId ? { ...p, isClueGiver: isManager } : p))
+  });
+  await persistRoom(roomCode, next, roomToken);
+  return next;
+}
+
+export async function applyClueGiverToggle(roomCode: string, playerId: string, roomToken: string) {
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) throw new Error("Room not found.");
+  const { state } = raw;
   if (state.phase !== "lobby") throw new Error("Role changes are only allowed in lobby.");
   const player = state.players.find((p) => p.id === playerId);
   if (!player || !player.team) throw new Error("Choose a team first.");
@@ -244,56 +282,44 @@ export async function applyClueGiverToggle(roomCode: string, playerId: string) {
     ...state,
     players: state.players.map((p) => (p.id === player.id ? { ...p, isClueGiver: !p.isClueGiver } : p))
   });
-  await persistRoom(roomCode, next);
+  await persistRoom(roomCode, next, roomToken);
   return next;
 }
 
-export async function applyRoleSelection(roomCode: string, playerId: string, isManager: boolean) {
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) throw new Error("Room not found.");
-  if (state.phase !== "lobby") throw new Error("Role selection is only allowed in lobby.");
-  const player = state.players.find((p) => p.id === playerId);
-  if (!player) throw new Error("Player not found.");
-  const next = ensureHostState({
-    ...state,
-    players: state.players.map((p) => (p.id === player.id ? { ...p, isClueGiver: isManager } : p))
-  });
-  await persistRoom(roomCode, next);
-  return next;
-}
-
-
-export async function applyStartGame(roomCode: string, playerId: string) {
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) throw new Error("Room not found.");
+export async function applyStartGame(roomCode: string, playerId: string, roomToken: string) {
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) throw new Error("Room not found.");
+  const { state } = raw;
   const fixed = ensureHostState(state);
   if (fixed.hostPlayerId !== playerId) throw new Error("Only host can start the game.");
   const next = startGame(fixed);
-  await persistRoom(roomCode, next);
+  await persistRoom(roomCode, next, roomToken);
   return next;
 }
 
-export async function applyReveal(roomCode: string, playerId: string, cardId: string) {
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) throw new Error("Room not found.");
+export async function applyReveal(roomCode: string, playerId: string, cardId: string, roomToken: string) {
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) throw new Error("Room not found.");
+  const { state } = raw;
   const player = state.players.find((p) => p.id === playerId);
   if (!player || !player.team) throw new Error("Player not in team.");
   if (player.isClueGiver) throw new Error("Clue givers cannot guess.");
   if (state.turn !== player.team) throw new Error("Only current team can guess.");
   const next = revealCard(state, cardId);
-  await persistRoom(roomCode, next);
+  await persistRoom(roomCode, next, roomToken);
   return next;
 }
 
-export async function applyEndTurn(roomCode: string, playerId: string) {
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) throw new Error("Room not found.");
+export async function applyEndTurn(roomCode: string, playerId: string, roomToken: string) {
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) throw new Error("Room not found.");
+  const { state } = raw;
   const player = state.players.find((p) => p.id === playerId);
   if (!player || !player.team) throw new Error("Player not in team.");
   if (player.isClueGiver) throw new Error("Clue givers cannot end turn.");
   if (state.turn !== player.team) throw new Error("Only current team can end turn.");
   const next = endTurn(state);
-  await persistRoom(roomCode, next);
+  await persistRoom(roomCode, next, roomToken);
   return next;
 }
 
@@ -301,10 +327,12 @@ export async function applyClue(
   roomCode: string,
   playerId: string,
   clue: string,
-  number: number
+  number: number,
+  roomToken: string
 ) {
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) throw new Error("Room not found.");
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) throw new Error("Room not found.");
+  const { state } = raw;
   const player = state.players.find((p) => p.id === playerId);
   if (!player || !player.team) throw new Error("Player not in team.");
   if (!player.isClueGiver) throw new Error("Only clue givers can submit clues.");
@@ -325,6 +353,6 @@ export async function applyClue(
     ...state,
     clueHistory: [entry, ...state.clueHistory].slice(0, 20)
   };
-  await persistRoom(roomCode, next);
+  await persistRoom(roomCode, next, roomToken);
   return next;
 }

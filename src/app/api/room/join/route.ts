@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   enforceRateLimit,
   getClientIpFromHeaders,
+  getRoomTokenFromHeaders,
   joinRoom,
   logAuditEvent,
   normalizeRoomCode,
@@ -12,6 +13,9 @@ export async function POST(request: Request) {
   let roomCode = "";
   let playerId: string | undefined = undefined;
   const ip = getClientIpFromHeaders(request.headers);
+  // ✅ FIX: token header'dan alınıyor
+  const roomToken = getRoomTokenFromHeaders(request.headers);
+
   try {
     const body = (await request.json()) as {
       roomCode?: string;
@@ -20,12 +24,15 @@ export async function POST(request: Request) {
       hostHint?: boolean;
       hostRole?: "manager" | "employee";
     };
+
     roomCode = normalizeRoomCode(body.roomCode ?? "");
     const nickname = body.nickname?.trim() ?? "";
     playerId = body.playerId?.trim() || undefined;
-    if (!roomCode || !nickname) {
+
+    if (!roomCode || !nickname || !roomToken) {
       return NextResponse.json({ error: "Missing room code, nickname, or room token." }, { status: 400 });
     }
+
     await enforceRateLimit({
       roomCode,
       actorKey: playerId ?? ip,
@@ -33,20 +40,18 @@ export async function POST(request: Request) {
       limit: 20,
       windowSeconds: 60
     });
+
     const result = await joinRoom({
       roomCode,
       nickname,
       playerId,
       hostHint: body.hostHint,
-      hostRole: body.hostRole
+      hostRole: body.hostRole,
+      roomToken // ✅ FIX: token joinRoom'a geçiyor
     });
-    await logAuditEvent({
-      roomCode,
-      playerId: result.playerId,
-      action: "join",
-      status: "success",
-      ip
-    });
+
+    await logAuditEvent({ roomCode, playerId: result.playerId, action: "join", status: "success", ip });
+
     return NextResponse.json({
       playerId: result.playerId,
       state: sanitizeStateForPlayer(result.state, result.playerId)
@@ -62,6 +67,9 @@ export async function POST(request: Request) {
         ip
       });
     }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Join failed." }, { status: 400 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Join failed." },
+      { status: 400 }
+    );
   }
 }
