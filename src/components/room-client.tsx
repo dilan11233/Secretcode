@@ -112,6 +112,14 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, hostRole }: 
   }, [client, roomCode, player]);
 
   useEffect(() => {
+    if (!player) return;
+    const interval = window.setInterval(() => {
+      void refreshState(player.id);
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [player, roomCode]);
+
+  useEffect(() => {
     if (!state || !player) return;
     const fromState = state.players.find((p) => p.id === player.id);
     if (fromState) setPlayer(fromState);

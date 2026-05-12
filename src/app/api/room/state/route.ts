@@ -22,9 +22,9 @@ export async function GET(request: Request) {
     limit: 120,
     windowSeconds: 60
   });
-  const state = await fetchRoomRaw(roomCode);
-  if (!state) {
+  const raw = await fetchRoomRaw(roomCode);
+  if (!raw) {
     return NextResponse.json({ error: "Room not found." }, { status: 404 });
   }
-  return NextResponse.json({ state: sanitizeStateForPlayer(state, playerId) });
+  return NextResponse.json({ state: sanitizeStateForPlayer(raw.state, playerId) });
 }

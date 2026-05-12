@@ -3,6 +3,7 @@ import {
   applyClue,
   enforceRateLimit,
   getClientIpFromHeaders,
+  getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
   sanitizeStateForPlayer
@@ -12,6 +13,7 @@ export async function POST(request: Request) {
   let roomCode = "";
   let playerId: string | null = null;
   const ip = getClientIpFromHeaders(request.headers);
+  const roomToken = getRoomTokenFromHeaders(request.headers);
   try {
     const body = (await request.json()) as {
       roomCode?: string;
@@ -21,11 +23,11 @@ export async function POST(request: Request) {
     };
     roomCode = normalizeRoomCode(body.roomCode ?? "");
     playerId = body.playerId?.trim() ?? null;
-    if (!roomCode || !playerId || !body.clue || !body.number) {
+    if (!roomCode || !playerId || !body.clue || !body.number || !roomToken) {
       return NextResponse.json({ error: "Missing inputs." }, { status: 400 });
     }
     await enforceRateLimit({ roomCode, actorKey: playerId ?? ip, action: "clue", limit: 15, windowSeconds: 60 });
-    const state = await applyClue(roomCode, playerId, body.clue, body.number);
+    const state = await applyClue(roomCode, playerId, body.clue, body.number, roomToken);
     await logAuditEvent({
       roomCode,
       playerId,

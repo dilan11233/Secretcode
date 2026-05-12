@@ -9,6 +9,8 @@ function JoinRoomContent() {
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [roomToken, setRoomToken] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -16,22 +18,56 @@ function JoinRoomContent() {
     // Linkteki ?code=... ve ?rt=... kısımlarını yakalar
     const codeFromUrl = searchParams.get("code");
     const tokenFromUrl = searchParams.get("rt");
-    
+
     if (codeFromUrl) setRoomCode(codeFromUrl.toUpperCase());
     if (tokenFromUrl) setRoomToken(tokenFromUrl);
   }, [searchParams]);
 
-  const joinRoom = () => {
-    if (!nickname.trim() || !roomCode.trim() || !roomToken.trim()) return;
-    
+  const joinRoom = async () => {
+    setError(null);
+    if (!nickname.trim()) {
+      setError("Lütfen bir takma ad girin.");
+      return;
+    }
+    if (!roomCode.trim()) {
+      setError("Lütfen bir oda kodu girin.");
+      return;
+    }
+
+    let token = roomToken.trim();
+    if (!token) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/room/token?roomCode=${encodeURIComponent(roomCode.trim().toUpperCase())}`);
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data?.error ?? "Oda token'ı alınamadı.");
+          return;
+        }
+        const data = (await res.json()) as { roomToken?: string; error?: string };
+        if (!data.roomToken) {
+          setError(data.error ?? "Oda token'ı alınamadı.");
+          return;
+        }
+        token = data.roomToken;
+        setRoomToken(token);
+      } catch (err) {
+        setError("Oda token'ı alınırken bir hata oluştu.");
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+
     router.push(
-      `/room/${roomCode.trim().toUpperCase()}?nick=${encodeURIComponent(nickname.trim())}&rt=${encodeURIComponent(roomToken.trim())}`
+      `/room/${roomCode.trim().toUpperCase()}?nick=${encodeURIComponent(nickname.trim())}&rt=${encodeURIComponent(token)}`
     );
   };
 
   return (
     <GlassCard className="w-full">
       <h1 className="text-2xl font-bold text-lilac">Join Room</h1>
+      {error && <p className="mt-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
       <input
         value={nickname}
         onChange={(e) => setNickname(e.target.value)}
@@ -46,12 +82,16 @@ function JoinRoomContent() {
       />
       <input
         value={roomToken}
-        readOnly
-        placeholder="Room Token (Automated)"
-        className="mt-3 w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/40 cursor-not-allowed"
+        onChange={(e) => setRoomToken(e.target.value)}
+        placeholder="Room Token (Paste if you have it)"
+        className="mt-3 w-full rounded-xl border border-white/30 bg-white/10 p-3 text-white"
       />
-      <button onClick={joinRoom} className="mt-4 w-full rounded-xl bg-lilac p-3 font-bold text-purpleNight hover:opacity-90 transition-all">
-        Join Lobby
+      <button
+        onClick={joinRoom}
+        disabled={loading}
+        className="mt-4 w-full rounded-xl bg-lilac p-3 font-bold text-purpleNight hover:opacity-90 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {loading ? "Joining..." : "Join Lobby"}
       </button>
     </GlassCard>
   );
