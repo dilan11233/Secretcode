@@ -27,6 +27,7 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, hostRole }: 
   const [clueNumber, setClueNumber] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dismissedReviewKey, setDismissedReviewKey] = useState<string | null>(null);
 
   const apiHeaders = useMemo(
     () => ({
@@ -187,7 +188,7 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, hostRole }: 
 
   if (loading || !state) return <div className="p-8 text-white">Loading room...</div>;
   if (error) return <div className="p-8 text-red-200">{error}</div>;
-
+  const reviewKey = state?.review ? JSON.stringify(state.review) : null;
   return (
     <main className="mx-auto max-w-7xl p-4 md:p-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -210,8 +211,13 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, hostRole }: 
         </button>
       </div>
 
-      <ReviewModal review={state.review} onClose={() => setState({ ...state, review: null })} />
-
+      <ReviewModal
+  review={reviewKey !== dismissedReviewKey ? state.review : null}
+  onClose={() => {
+    setDismissedReviewKey(reviewKey);
+    setState({ ...state, review: null });
+  }}
+/>
       {state.phase === "lobby" ? (
         <section className="grid gap-4 md:grid-cols-2">
           <GlassCard>
@@ -269,14 +275,21 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, hostRole }: 
                 Green Team
               </button>
             </div>
-            {iAmHost && (
-              <button
-                onClick={() => void onStartGame()}
-                className="mt-6 w-full rounded-xl bg-lilac py-3 font-black text-purpleNight hover:opacity-90 disabled:opacity-40"
-              >
-                START GAME
-              </button>
-            )}
+            {iAmHost ? (
+  <button
+    onClick={() => void onStartGame()}
+    className="mt-6 w-full rounded-xl bg-lilac py-3 font-black text-purpleNight hover:opacity-90 disabled:opacity-40"
+  >
+    START GAME
+  </button>
+) : (
+  <button
+    disabled
+    className="mt-6 w-full rounded-xl border border-white/20 bg-white/10 py-3 font-black text-white/70 cursor-not-allowed"
+  >
+    JOINED • WAITING FOR HOST
+  </button>
+)}
           </GlassCard>
         </section>
       ) : (
