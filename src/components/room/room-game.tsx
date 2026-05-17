@@ -2,7 +2,7 @@
 
 import { GlassCard } from "@/components/glass-card";
 import { teamDisplayName } from "@/lib/labels";
-import type { BoardCard, ClueEntry, GameState, Player } from "@/lib/types";
+import type { BoardCard, ClueEntry, GameState, Player, Team } from "@/lib/types";
 
 interface BoardProps {
   state: GameState;
@@ -14,7 +14,7 @@ interface BoardProps {
 }
 
 export function RoomGameBoard({ state, player, canGuess, showCardRoles, onReveal, onEndTurn }: BoardProps) {
-  const latestClue = state.clueHistory[0] ?? null;
+  const activeClue = state.activeClue;
 
   return (
     <GlassCard className="w-full">
@@ -31,15 +31,19 @@ export function RoomGameBoard({ state, player, canGuess, showCardRoles, onReveal
         </div>
       </div>
 
-      {latestClue && (
+      {activeClue ? (
         <div className="mb-4 rounded-xl border border-lilac/40 bg-lilac/15 p-4">
-          <p className="text-xs font-bold uppercase text-white/60">Latest Clue</p>
+          <p className="text-xs font-bold uppercase text-white/60">Active Clue</p>
           <p className="text-2xl font-black text-lilac">
-            {latestClue.clue} <span className="text-white/80">[{latestClue.number}]</span>
+            {activeClue.clue} <span className="text-white/80">[{state.guessesRemaining} left]</span>
           </p>
           <p className="text-xs text-white/60">
-            {teamDisplayName(latestClue.team)} by {latestClue.by}
+            {teamDisplayName(activeClue.team)} by {activeClue.by}
           </p>
+        </div>
+      ) : (
+        <div className="mb-4 rounded-xl border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/60">
+          Waiting for {teamDisplayName(state.turn)} Clue Giver to send a clue.
         </div>
       )}
 
@@ -80,6 +84,11 @@ export function RoomGameBoard({ state, player, canGuess, showCardRoles, onReveal
         >
           End Turn
         </button>
+      )}
+      {!player.isClueGiver && state.phase === "playing" && state.turn === player.team && !canGuess && !state.winner && (
+        <p className="mt-4 rounded-xl border border-dashed border-white/20 p-3 text-center text-sm text-white/60">
+          You can guess after your Clue Giver sends a clue.
+        </p>
       )}
       {state.winner && (
         <div className="mt-6 rounded-xl bg-lilac p-4 text-center">
@@ -135,6 +144,7 @@ function CardButton({
 interface CluePanelProps {
   state: GameState;
   player: Player;
+  team: Team;
   clueWord: string;
   clueNumber: number;
   onClueWordChange: (value: string) => void;
@@ -145,18 +155,34 @@ interface CluePanelProps {
 export function RoomCluePanel({
   state,
   player,
+  team,
   clueWord,
   clueNumber,
   onClueWordChange,
   onClueNumberChange,
   onSubmitClue
 }: CluePanelProps) {
-  const isMyTurn = state.turn === player.team;
-  const canSubmit = player.isClueGiver && isMyTurn;
+  const isPanelTeamTurn = state.turn === team;
+  const isMyTeamPanel = player.team === team;
+  const canSubmit = player.isClueGiver && isMyTeamPanel && isPanelTeamTurn && !state.activeClue;
+  const activeForTeam = state.activeClue?.team === team ? state.activeClue : null;
+  const entries = state.clueHistory.filter((entry) => entry.team === team);
+  const colorClasses =
+    team === "blue"
+      ? "border-sky-300/60 bg-sky-500/15 text-sky-100"
+      : "border-emerald-300/60 bg-emerald-500/15 text-emerald-100";
 
   return (
-    <GlassCard>
-      <h3 className="text-lg font-bold">Clue Panel</h3>
+    <GlassCard className={`border ${colorClasses}`}>
+      <h3 className="text-lg font-bold">{teamDisplayName(team)} Clue</h3>
+      {activeForTeam && (
+        <div className="mt-3 rounded-xl bg-black/20 p-3">
+          <p className="text-xs font-bold uppercase text-white/50">Current</p>
+          <p className="text-xl font-black text-lilac">
+            {activeForTeam.clue} <span className="text-white/80">[{state.guessesRemaining} left]</span>
+          </p>
+        </div>
+      )}
       {canSubmit ? (
         <div className="mt-3 space-y-2">
           <input
@@ -184,12 +210,16 @@ export function RoomCluePanel({
         </div>
       ) : (
         <p className="mt-3 rounded-xl border border-dashed border-white/20 py-4 text-center text-sm italic opacity-60">
-          {isMyTurn ? "Waiting for your Clue Giver..." : "Waiting for the other team..."}
+          {isPanelTeamTurn
+            ? activeForTeam
+              ? "Guessers are choosing cards."
+              : "Waiting for this team's Clue Giver..."
+            : "Waiting for the other team..."}
         </p>
       )}
 
       <h4 className="mt-6 border-b border-white/10 pb-2 font-semibold">Clue History</h4>
-      <ClueHistory entries={state.clueHistory} />
+      <ClueHistory entries={entries} />
     </GlassCard>
   );
 }

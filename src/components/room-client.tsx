@@ -146,8 +146,32 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, forceNewSess
 
   const canGuess = useMemo(() => {
     if (!state || !myTeam || iAmClueGiver) return false;
-    return state.phase === "playing" && state.turn === myTeam && !state.winner;
+    return (
+      state.phase === "playing" &&
+      state.turn === myTeam &&
+      !!state.activeClue &&
+      state.activeClue.team === myTeam &&
+      state.guessesRemaining > 0 &&
+      !state.winner
+    );
   }, [state, myTeam, iAmClueGiver]);
+
+  const submitClue = async () => {
+    if (!state || !clueWord.trim()) {
+      setError("Enter a one-word clue.");
+      return;
+    }
+    const clueLower = clueWord.trim().toLowerCase();
+    if (state.cards.some((c) => c.term.toLowerCase() === clueLower)) {
+      setError("Clue cannot match a word on the board.");
+      return;
+    }
+    const ok = await postAction("/api/room/clue", { clue: clueWord.trim(), number: clueNumber });
+    if (ok) {
+      setClueWord("");
+      setClueNumber(1);
+    }
+  };
 
   const postAction = async (path: string, body: Record<string, unknown> = {}) => {
     if (!player) return false;
@@ -235,7 +259,16 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, forceNewSess
         />
       ) : (
         <section className="grid items-start gap-4 xl:grid-cols-[260px_minmax(0,1fr)_260px]">
-          <TeamRail state={state} team="blue" currentPlayerId={player.id} />
+          <TeamColumn
+            state={state}
+            player={player}
+            team="blue"
+            clueWord={clueWord}
+            clueNumber={clueNumber}
+            onClueWordChange={setClueWord}
+            onClueNumberChange={setClueNumber}
+            onSubmitClue={submitClue}
+          />
           <RoomGameBoard
             state={state}
             player={player}
@@ -244,48 +277,68 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, forceNewSess
             onReveal={(cardId) => void postAction("/api/room/reveal", { cardId })}
             onEndTurn={() => void postAction("/api/room/end-turn")}
           />
-          <div className="space-y-4">
-            <TeamRail state={state} team="green" currentPlayerId={player.id} />
-            <RoomCluePanel
-              state={state}
-              player={player}
-              clueWord={clueWord}
-              clueNumber={clueNumber}
-              onClueWordChange={setClueWord}
-              onClueNumberChange={setClueNumber}
-              onSubmitClue={async () => {
-                if (!clueWord.trim()) {
-                  setError("Enter a one-word clue.");
-                  return;
-                }
-                const clueLower = clueWord.trim().toLowerCase();
-                if (state.cards.some((c) => c.term.toLowerCase() === clueLower)) {
-                  setError("Clue cannot match a word on the board.");
-                  return;
-                }
-                const ok = await postAction("/api/room/clue", { clue: clueWord.trim(), number: clueNumber });
-                if (ok) {
-                  setClueWord("");
-                  setClueNumber(1);
-                }
-              }}
-            />
-          </div>
+          <TeamColumn
+            state={state}
+            player={player}
+            team="green"
+            clueWord={clueWord}
+            clueNumber={clueNumber}
+            onClueWordChange={setClueWord}
+            onClueNumberChange={setClueNumber}
+            onSubmitClue={submitClue}
+          />
         </section>
       )}
     </main>
   );
 }
 
+function TeamColumn({
+  state,
+  player,
+  team,
+  clueWord,
+  clueNumber,
+  onClueWordChange,
+  onClueNumberChange,
+  onSubmitClue
+}: {
+  state: GameState;
+  player: Player;
+  team: Team;
+  clueWord: string;
+  clueNumber: number;
+  onClueWordChange: (value: string) => void;
+  onClueNumberChange: (value: number) => void;
+  onSubmitClue: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <TeamRail state={state} team={team} currentPlayerId={player.id} />
+      <RoomCluePanel
+        state={state}
+        player={player}
+        team={team}
+        clueWord={clueWord}
+        clueNumber={clueNumber}
+        onClueWordChange={onClueWordChange}
+        onClueNumberChange={onClueNumberChange}
+        onSubmitClue={onSubmitClue}
+      />
+    </div>
+  );
+}
+
 function TeamRail({ state, team, currentPlayerId }: { state: GameState; team: Team; currentPlayerId: string }) {
   const members = state.players.filter((p) => p.team === team);
   const clueGiver = members.find((p) => p.isClueGiver);
-  const border = team === "blue" ? "border-blue-300/50" : "border-emerald-300/50";
-  const text = team === "blue" ? "text-blue-200" : "text-emerald-200";
+  const border = team === "blue" ? "border-sky-300/60" : "border-emerald-300/60";
+  const bg = team === "blue" ? "bg-sky-500/15" : "bg-emerald-500/15";
+  const text = team === "blue" ? "text-sky-100" : "text-emerald-100";
   const scoreTarget = team === "blue" ? 9 : 8;
 
   return (
-    <aside className={`rounded-xl border ${border} bg-white/10 p-4 shadow-glass backdrop-blur-lg`}>
+    <aside className={`rounded-xl border ${border} ${bg} p-4 shadow-glass backdrop-blur-lg`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className={`text-xs font-bold uppercase ${text}`}>{teamDisplayName(team)}</p>

@@ -39,6 +39,8 @@ export function createInitialGameState(roomCode: string): GameState {
     turn: "blue",
     scores: { blue: 9, green: 8 },
     clueHistory: [],
+    activeClue: null,
+    guessesRemaining: 0,
     review: null,
     winner: null
   };
@@ -51,6 +53,8 @@ export function startGame(state: GameState): GameState {
     cards: generateBoard(),
     scores: { blue: 9, green: 8 },
     turn: "blue",
+    activeClue: null,
+    guessesRemaining: 0,
     winner: null,
     review: null
   };
@@ -82,6 +86,8 @@ export function revealCard(state: GameState, cardId: string): GameState {
       cards,
       winner: state.turn === "blue" ? "green" : "blue",
       phase: "finished",
+      activeClue: null,
+      guessesRemaining: 0,
       review: getReview(selected.term, "Forbidden card selected. Instant loss.")
     };
   }
@@ -94,6 +100,8 @@ export function revealCard(state: GameState, cardId: string): GameState {
   const currentTeam = state.turn;
   let nextTurn: Team = currentTeam;
   let reason = "Correct guess for your team.";
+  let activeClue = state.activeClue;
+  let guessesRemaining = Math.max(0, state.guessesRemaining - 1);
 
   if (selected.role === "N") {
     nextTurn = currentTeam === "blue" ? "green" : "blue";
@@ -101,6 +109,14 @@ export function revealCard(state: GameState, cardId: string): GameState {
   } else if (selected.role !== currentTeam) {
     nextTurn = currentTeam === "blue" ? "green" : "blue";
     reason = "Wrong team card selected. Turn ended.";
+  } else if (guessesRemaining === 0) {
+    nextTurn = currentTeam === "blue" ? "green" : "blue";
+    reason = "Correct guess. Clue limit reached. Turn ended.";
+  }
+
+  if (nextTurn !== currentTeam) {
+    activeClue = null;
+    guessesRemaining = 0;
   }
 
   const winner = scores.blue === 0 ? "blue" : scores.green === 0 ? "green" : null;
@@ -109,6 +125,8 @@ export function revealCard(state: GameState, cardId: string): GameState {
     cards,
     scores,
     turn: winner ? state.turn : nextTurn,
+    activeClue: winner ? null : activeClue,
+    guessesRemaining: winner ? 0 : guessesRemaining,
     winner,
     phase: winner ? "finished" : state.phase,
     review: getReview(selected.term, reason)
@@ -119,6 +137,8 @@ export function endTurn(state: GameState): GameState {
   if (state.phase !== "playing") return state;
   return {
     ...state,
-    turn: state.turn === "blue" ? "green" : "blue"
+    turn: state.turn === "blue" ? "green" : "blue",
+    activeClue: null,
+    guessesRemaining: 0
   };
 }

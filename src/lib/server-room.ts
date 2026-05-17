@@ -193,12 +193,18 @@ export function ensureHostState(state: GameState): GameState {
   const hostExists = state.hostPlayerId && state.players.some((p) => p.id === state.hostPlayerId);
   const hostPlayerId = hostExists ? state.hostPlayerId : state.players[0]?.id ?? null;
   const players = state.players.map((p) => ({ ...p, isHost: !!hostPlayerId && p.id === hostPlayerId }));
-  return { ...state, hostPlayerId, players };
+  return {
+    ...state,
+    hostPlayerId,
+    players,
+    activeClue: state.activeClue ?? null,
+    guessesRemaining: state.guessesRemaining ?? 0
+  };
 }
 
 export async function getRoomState(roomCode: string, roomToken: string, playerId: string | null) {
   const { state } = await loadRoom(roomCode, roomToken);
-  return sanitizeStateForPlayer(state, playerId);
+  return sanitizeStateForPlayer(ensureHostState(state), playerId);
 }
 
 export async function joinRoom(input: {
@@ -317,7 +323,11 @@ export async function applyReveal(roomCode: string, playerId: string, cardId: st
   if (!player || !player.team) throw new Error("Player not on a team.");
   if (player.isClueGiver) throw new Error("Clue givers cannot guess.");
   if (state.turn !== player.team) throw new Error("Only the active team can guess.");
-  const next = revealCard(state, cardId);
+  const fixed = ensureHostState(state);
+  if (!fixed.activeClue || fixed.activeClue.team !== player.team || fixed.guessesRemaining <= 0) {
+    throw new Error("Wait for your Clue Giver to send a clue before guessing.");
+  }
+  const next = revealCard(fixed, cardId);
   await persistRoom(roomCode, next, roomToken);
   return next;
 }
@@ -328,7 +338,9 @@ export async function applyEndTurn(roomCode: string, playerId: string, roomToken
   if (!player || !player.team) throw new Error("Player not on a team.");
   if (player.isClueGiver) throw new Error("Clue givers cannot end the turn.");
   if (state.turn !== player.team) throw new Error("Only the active team can end the turn.");
-  const next = endTurn(state);
+  const fixed = ensureHostState(state);
+  if (!fixed.activeClue) throw new Error("There is no active clue to end.");
+  const next = endTurn(fixed);
   await persistRoom(roomCode, next, roomToken);
   return next;
 }
@@ -342,9 +354,12 @@ export async function applyClue(
 ) {
   const { state } = await loadRoom(roomCode, roomToken);
   const player = state.players.find((p) => p.id === playerId);
+  if (state.phase !== "playing") throw new Error("Game is not in progress.");
   if (!player || !player.team) throw new Error("Player not on a team.");
   if (!player.isClueGiver) throw new Error("Only clue givers can submit clues.");
   if (state.turn !== player.team) throw new Error("Not your team's turn.");
+  const fixed = ensureHostState(state);
+  if (fixed.activeClue) throw new Error("A clue is already active. End the turn before sending another clue.");
   const cleanClue = clue.trim().toLowerCase();
   if (!cleanClue) throw new Error("Clue is required.");
   if (state.cards.some((c) => c.term.toLowerCase() === cleanClue)) {
@@ -353,11 +368,16 @@ export async function applyClue(
   const entry: ClueEntry = {
     team: player.team,
     clue: clue.trim(),
-    number: Math.max(1, Math.min(9, Math.floor(number))),
+    number: Number.isFinite(number) ? Math.max(1, Math.min(9, Math.floor(number))) : 1,
     by: player.nickname,
     createdAt: new Date().toISOString()
   };
-  const next = { ...state, clueHistory: [entry, ...state.clueHistory].slice(0, 20) };
+  const next = {
+    ...fixed,
+    activeClue: entry,
+    guessesRemaining: entry.number,
+    clueHistory: [entry, ...fixed.clueHistory].slice(0, 20)
+  };
   await persistRoom(roomCode, next, roomToken);
   return next;
 }

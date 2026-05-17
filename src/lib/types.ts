@@ -51,6 +51,8 @@ export interface GameState {
   turn: Team;
   scores: Record<Team, number>;
   clueHistory: ClueEntry[];
+  activeClue: ClueEntry | null;
+  guessesRemaining: number;
   review: ReviewEntry | null;
   winner: Team | null;
 }
