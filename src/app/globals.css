@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply min-h-screen bg-gradient-to-br from-purpleNight via-purpleDeep to-violetSoft text-white font-mono;
+  font-family: var(--font-space-mono), var(--font-jetbrains-mono), monospace;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-space-mono), var(--font-jetbrains-mono), monospace;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.glass {
+  @apply border border-white/30 bg-white/20 backdrop-blur-lg shadow-glass;
+}
+
+.info-button {
+  @apply relative inline-flex items-center justify-center w-8 h-8 text-lg font-bold rounded-full border-2 border-white/50 hover:border-lilac text-white/70 hover:text-lilac transition-all duration-300 cursor-pointer hover:scale-110;
+}
+
+.modal-overlay {
+  @apply fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50;
+}
+
+.modal-content {
+  @apply bg-gradient-to-br from-purpleDeep via-purpleDeep to-violetSoft border border-white/30 rounded-2xl p-8 max-w-md shadow-2xl;
+}
+
+.modal-close {
+  @apply absolute top-4 right-4 text-white/50 hover:text-white transition-colors cursor-pointer text-2xl;
+}
