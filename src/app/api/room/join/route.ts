@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   enforceRateLimit,
+  fetchRoomRaw,
   getClientIpFromHeaders,
   getRoomTokenFromHeaders,
   joinRoom,
@@ -34,13 +35,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing room code, nickname, or room token." }, { status: 400 });
     }
 
-    await enforceRateLimit({
-      roomCode,
-      actorKey: playerId ?? ip,
-      action: "join",
-      limit: 20,
-      windowSeconds: 60
-    });
+    const existingRoom = await fetchRoomRaw(roomCode);
+    if (existingRoom) {
+      await enforceRateLimit({
+        roomCode,
+        actorKey: playerId ?? ip,
+        action: "join",
+        limit: 20,
+        windowSeconds: 60
+      });
+    }
 
     const result = await joinRoom({
       roomCode,
