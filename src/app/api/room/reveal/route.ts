@@ -6,6 +6,7 @@ import {
   getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     }
     await enforceRateLimit({ roomCode, actorKey: playerId ?? ip, action: "reveal", limit: 40, windowSeconds: 60 });
     const state = await applyReveal(roomCode, playerId, body.cardId, roomToken);
-    await logAuditEvent({
+    queueAuditEvent({
       roomCode,
       playerId,
       action: "reveal",

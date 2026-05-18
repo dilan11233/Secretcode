@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GlassCard } from "@/components/glass-card";
+import { LoadingState } from "@/components/loading-state";
 
 // Next.js useSearchParams için içeriği ayrı bir componentte tutmamız şart
 function JoinRoomContent() {
@@ -105,7 +106,7 @@ export default function JoinRoomPage() {
         ← Back
       </button>
       <div className="flex items-center">
-        <Suspense fallback={<div className="text-white">Loading join panel...</div>}>
+        <Suspense fallback={<LoadingState label="Loading join panel" />}>
           <JoinRoomContent />
         </Suspense>
       </div>

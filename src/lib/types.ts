@@ -24,6 +24,7 @@ export interface BoardCard {
   term: string;
   role: CardRole;
   revealed: boolean;
+  definition?: string;
 }
 
 export interface ClueEntry {

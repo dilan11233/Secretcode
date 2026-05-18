@@ -7,6 +7,7 @@ import {
   joinRoom,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
       roomToken // ✅ FIX: token joinRoom'a geçiyor
     });
 
-    await logAuditEvent({ roomCode, playerId: result.playerId, action: "join", status: "success", ip });
+    queueAuditEvent({ roomCode, playerId: result.playerId, action: "join", status: "success", ip });
 
     return NextResponse.json({
       playerId: result.playerId,

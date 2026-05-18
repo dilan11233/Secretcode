@@ -68,14 +68,14 @@ export default function CreateRoomPage() {
             onClick={() => setHostRole("manager")}
             className={`rounded-xl px-4 py-3 font-bold ${hostRole === "manager" ? "bg-lilac text-purpleNight" : "bg-white/10 text-white"}`}
           >
-            Clue Giver
+            Manager
           </button>
           <button
             type="button"
             onClick={() => setHostRole("employee")}
             className={`rounded-xl px-4 py-3 font-bold ${hostRole === "employee" ? "bg-lilac text-purpleNight" : "bg-white/10 text-white"}`}
           >
-            Guesser
+            Employee
           </button>
         </div>
         <input

@@ -23,10 +23,10 @@ export function validateLobbyForStart(state: GameState): void {
     }
     const clueGivers = members.filter((p) => p.isClueGiver);
     if (clueGivers.length !== 1) {
-      throw new Error(`${teamDisplayName(team)} must have exactly one Clue Giver.`);
+      throw new Error(`${teamDisplayName(team)} must have exactly one Manager.`);
     }
     if (members.filter((p) => !p.isClueGiver).length < 1) {
-      throw new Error(`${teamDisplayName(team)} needs at least one Guesser.`);
+      throw new Error(`${teamDisplayName(team)} needs at least one Employee.`);
     }
   }
 }

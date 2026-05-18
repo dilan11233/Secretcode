@@ -7,6 +7,7 @@ import {
   getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     const state = await applyRoleSelection(roomCode, playerId, !player.isClueGiver, roomToken);
-    await logAuditEvent({ roomCode, playerId, action: "clue-giver", status: "success", ip });
+    queueAuditEvent({ roomCode, playerId, action: "clue-giver", status: "success", ip });
 
     return NextResponse.json({ state: sanitizeStateForPlayer(state, playerId) });
   } catch (error) {

@@ -6,6 +6,7 @@ import {
   getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     });
 
     const state = await applyDismissReview(roomCode, roomToken);
-    await logAuditEvent({ roomCode, playerId, action: "dismiss-review", status: "success", ip });
+    queueAuditEvent({ roomCode, playerId, action: "dismiss-review", status: "success", ip });
 
     return NextResponse.json({ state: sanitizeStateForPlayer(state, playerId) });
   } catch (error) {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { nanoid } from "nanoid";
+import { LoadingState } from "@/components/loading-state";
 import { ReviewModal } from "@/components/review-modal";
 import { RoomCluePanel, RoomGameBoard } from "@/components/room/room-game";
 import { RoomLobby } from "@/components/room/room-lobby";
@@ -128,7 +129,7 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, forceNewSess
 
   useEffect(() => {
     if (!player) return;
-    const interval = window.setInterval(() => void refreshState(player.id), 3000);
+    const interval = window.setInterval(() => void refreshState(player.id), 8000);
     return () => window.clearInterval(interval);
   }, [player, refreshState]);
 
@@ -203,7 +204,7 @@ export function RoomClient({ roomCode, roomToken, nickname, isHost, forceNewSess
   };
 
   if (loading || !state || !player) {
-    return <div className="p-8 text-white">Loading room...</div>;
+    return <LoadingState label="Loading room" />;
   }
   if (error && !state) {
     return <div className="p-8 text-red-200">{error}</div>;
@@ -361,13 +362,13 @@ function TeamRail({ state, team, currentPlayerId }: { state: GameState; team: Te
               className={`rounded-lg bg-black/20 p-3 text-sm ${member.id === currentPlayerId ? "ring-2 ring-lilac" : ""}`}
             >
               <p className="font-bold text-white">{member.nickname}</p>
-              <p className="text-xs text-white/60">{member.isClueGiver ? "Clue Giver" : "Guesser"}</p>
+              <p className="text-xs text-white/60">{member.isClueGiver ? "Manager" : "Employee"}</p>
             </div>
           ))
         )}
       </div>
       <div className="mt-4 rounded-lg bg-black/20 p-3 text-xs text-white/70">
-        <span className="font-bold text-white">Clue Giver:</span> {clueGiver?.nickname ?? "Not selected"}
+        <span className="font-bold text-white">Manager:</span> {clueGiver?.nickname ?? "Not selected"}
       </div>
     </aside>
   );

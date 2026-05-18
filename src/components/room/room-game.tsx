@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { GlassCard } from "@/components/glass-card";
 import { teamDisplayName } from "@/lib/labels";
 import type { BoardCard, ClueEntry, GameState, Player, Team } from "@/lib/types";
@@ -15,6 +16,7 @@ interface BoardProps {
 
 export function RoomGameBoard({ state, player, canGuess, showCardRoles, onReveal, onEndTurn }: BoardProps) {
   const activeClue = state.activeClue;
+  const [definitionCard, setDefinitionCard] = useState<BoardCard | null>(null);
 
   return (
     <GlassCard className="w-full">
@@ -43,7 +45,7 @@ export function RoomGameBoard({ state, player, canGuess, showCardRoles, onReveal
         </div>
       ) : (
         <div className="mb-4 rounded-xl border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/60">
-          Waiting for {teamDisplayName(state.turn)} Clue Giver to send a clue.
+          Waiting for {teamDisplayName(state.turn)} Manager to send a clue.
         </div>
       )}
 
@@ -53,8 +55,14 @@ export function RoomGameBoard({ state, player, canGuess, showCardRoles, onReveal
             key={card.id}
             card={card}
             showRole={showCardRoles}
-            disabled={!canGuess || card.revealed}
-            onClick={() => onReveal(card.id)}
+            disabled={showCardRoles ? false : !canGuess || card.revealed}
+            onClick={() => {
+              if (showCardRoles) {
+                setDefinitionCard(card);
+                return;
+              }
+              onReveal(card.id);
+            }}
           />
         ))}
       </div>
@@ -87,12 +95,31 @@ export function RoomGameBoard({ state, player, canGuess, showCardRoles, onReveal
       )}
       {!player.isClueGiver && state.phase === "playing" && state.turn === player.team && !canGuess && !state.winner && (
         <p className="mt-4 rounded-xl border border-dashed border-white/20 p-3 text-center text-sm text-white/60">
-          You can guess after your Clue Giver sends a clue.
+          You can guess after your Manager sends a clue.
         </p>
       )}
       {state.winner && (
         <div className="mt-6 rounded-xl bg-lilac p-4 text-center">
           <p className="text-xl font-black uppercase text-purpleNight">{teamDisplayName(state.winner)} wins!</p>
+        </div>
+      )}
+
+      {definitionCard && showCardRoles && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4">
+          <div className="glass w-full max-w-xl rounded-2xl p-6">
+            <p className="text-xs font-bold uppercase text-white/50">Word Explanation</p>
+            <h2 className="mt-2 text-xl font-bold text-lilac">{definitionCard.term}</h2>
+            <p className="mt-3 text-sm leading-6 text-white/90">
+              {definitionCard.definition ?? "Definition unavailable."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setDefinitionCard(null)}
+              className="mt-5 rounded-xl bg-lilac px-4 py-2 font-semibold text-purpleNight"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </GlassCard>
@@ -212,8 +239,8 @@ export function RoomCluePanel({
         <p className="mt-3 rounded-xl border border-dashed border-white/20 py-4 text-center text-sm italic opacity-60">
           {isPanelTeamTurn
             ? activeForTeam
-              ? "Guessers are choosing cards."
-              : "Waiting for this team's Clue Giver..."
+              ? "Employees are choosing cards."
+              : "Waiting for this team's Manager..."
             : "Waiting for the other team..."}
         </p>
       )}

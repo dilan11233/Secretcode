@@ -6,6 +6,7 @@ import {
   getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     }
     await enforceRateLimit({ roomCode, actorKey: playerId ?? ip, action: "end-turn", limit: 20, windowSeconds: 60 });
     const state = await applyEndTurn(roomCode, playerId, roomToken);
-    await logAuditEvent({ roomCode, playerId, action: "end-turn", status: "success", ip });
+    queueAuditEvent({ roomCode, playerId, action: "end-turn", status: "success", ip });
     return NextResponse.json({ state: sanitizeStateForPlayer(state, body.playerId ?? null) });
   } catch (error) {
     if (roomCode) {

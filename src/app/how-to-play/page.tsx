@@ -17,10 +17,10 @@ export default function HowToPlayPage() {
       <GlassCard>
         <h1 className="text-3xl font-bold text-lilac">How to Play SECRETCODE</h1>
         <div className="mt-4 space-y-3 text-white/90">
-          <p>Two teams compete: Team A and Team B. Each team picks one Clue Giver.</p>
-          <p>Clue Givers see secret card roles and provide one-word clues with a number.</p>
-          <p>Guessers select cards based on clues. Correct team cards continue momentum.</p>
-          <p>Turn ends if a neutral card or wrong-team card is selected, or if guessers end turn.</p>
+          <p>Two teams compete: Team A and Team B. Each team picks one Manager.</p>
+          <p>Managers see secret card roles and provide one-word clues with a number.</p>
+          <p>Employees select cards based on clues. Correct team cards continue momentum.</p>
+          <p>Turn ends if a neutral card or wrong-team card is selected, or if employees end turn.</p>
           <p>If a team picks the forbidden card, that team instantly loses.</p>
           <p>
             Learning goal: each selected term opens feedback with definition and related ISO concept.

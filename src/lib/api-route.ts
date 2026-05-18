@@ -5,6 +5,7 @@ import {
   getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 import type { GameState } from "@/lib/types";
@@ -44,7 +45,7 @@ export async function handleRoomAction<TBody extends { roomCode?: string; player
     });
 
     const state = await options.run({ roomCode, playerId, roomToken });
-    await logAuditEvent({ roomCode, playerId, action: options.action, status: "success", ip });
+    queueAuditEvent({ roomCode, playerId, action: options.action, status: "success", ip });
 
     return NextResponse.json({ state: sanitizeStateForPlayer(state, playerId) });
   } catch (error) {

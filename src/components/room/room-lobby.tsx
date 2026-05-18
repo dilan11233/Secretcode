@@ -26,7 +26,7 @@ export function RoomLobby({ state, player, isHost, isClueGiver, onSelectRole, on
               {p.isHost ? " (Host)" : ""}
               <span className="opacity-70">
                 {p.team ? ` — ${teamColorLabel(p.team)}` : " — No team"}
-                {p.isClueGiver ? " · Clue Giver" : " · Guesser"}
+                {p.isClueGiver ? " · Manager" : " · Employee"}
               </span>
             </li>
           ))}
@@ -47,7 +47,7 @@ export function RoomLobby({ state, player, isHost, isClueGiver, onSelectRole, on
               isClueGiver ? "bg-yellow-600 font-bold ring-2 ring-yellow-400" : "bg-white/10 hover:bg-white/20"
             }`}
           >
-            Clue Giver
+            Manager
           </button>
           <button
             type="button"
@@ -59,7 +59,7 @@ export function RoomLobby({ state, player, isHost, isClueGiver, onSelectRole, on
                 : "bg-white/10 hover:bg-white/20"
             }`}
           >
-            Guesser
+            Employee
           </button>
         </div>
 

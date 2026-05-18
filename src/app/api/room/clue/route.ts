@@ -6,6 +6,7 @@ import {
   getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     }
     await enforceRateLimit({ roomCode, actorKey: playerId ?? ip, action: "clue", limit: 15, windowSeconds: 60 });
     const state = await applyClue(roomCode, playerId, body.clue, body.number, roomToken);
-    await logAuditEvent({
+    queueAuditEvent({
       roomCode,
       playerId,
       action: "clue",

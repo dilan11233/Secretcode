@@ -25,7 +25,8 @@ export function generateBoard(): BoardCard[] {
     termId: term.id,
     term: term.term,
     role: roles[idx],
-    revealed: false
+    revealed: false,
+    definition: term.definition
   }));
 }
 

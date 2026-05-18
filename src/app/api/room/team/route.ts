@@ -7,6 +7,7 @@ import {
   getRoomTokenFromHeaders,
   logAuditEvent,
   normalizeRoomCode,
+  queueAuditEvent,
   sanitizeStateForPlayer
 } from "@/lib/server-room";
 import type { Team } from "@/lib/types";
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
 
     await enforceRateLimit({ roomCode, actorKey: playerId, action: "team", limit: 20, windowSeconds: 60 });
     const state = await applyTeamSelection(roomCode, playerId, team, roomToken); // ✅
-    await logAuditEvent({ roomCode, playerId, action: "team", status: "success", ip });
+    queueAuditEvent({ roomCode, playerId, action: "team", status: "success", ip });
 
     return NextResponse.json({ state: sanitizeStateForPlayer(state, playerId) });
   } catch (error) {
