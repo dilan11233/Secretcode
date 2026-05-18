@@ -139,6 +139,7 @@ function CardButton({
 }) {
   let bgColor = "bg-white/10";
   let label = "";
+  const revealedClasses = card.revealed ? "opacity-70 ring-2 ring-white/25" : "";
   if (card.revealed || showRole) {
     if (card.role === "X") {
       bgColor = "border-2 border-red-500 bg-red-900";
@@ -160,9 +161,16 @@ function CardButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${bgColor} flex min-h-[104px] flex-col items-center justify-center rounded-xl p-3 text-center text-sm font-bold transition hover:scale-[1.02] disabled:opacity-80`}
+      className={`${bgColor} ${revealedClasses} flex min-h-[104px] flex-col items-center justify-center rounded-xl p-3 text-center text-sm font-bold transition hover:scale-[1.02] disabled:opacity-80`}
     >
-      <p className="break-words uppercase">{card.term}</p>
+      <p className={`break-words uppercase ${card.revealed ? "text-white/75 line-through decoration-white decoration-2" : ""}`}>
+        {card.term}
+      </p>
+      {card.revealed && (
+        <span className="mt-2 rounded-md bg-black/35 px-2 py-1 text-[10px] uppercase tracking-wide text-white/80">
+          Selected
+        </span>
+      )}
       {label && <span className="mt-2 rounded-md bg-black/25 px-2 py-1 text-[10px] uppercase text-white/80">{label}</span>}
     </button>
   );
